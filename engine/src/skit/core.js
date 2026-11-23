@@ -7,6 +7,8 @@
 const GAP = 0.12;
 const START = 0.15;
 const SLOTS = ["broker", "girl", "uncle"];
+/** worlds rendered by the 3D stage (blocky toy characters); everything else is 2D */
+export const WORLDS_3D = ["town", "classroom", "bedroom"];
 
 /** Rough timing for a line without TTS (≈2.6 words/s), with per-word caption timings. */
 export function estimateLine(text, wordsPerSec = 2.6) {
@@ -24,14 +26,18 @@ export function estimateLine(text, wordsPerSec = 2.6) {
 /** Which character slot (broker/girl/uncle) each cast member uses. */
 export function slotMap(spec) {
   const map = {};
-  spec.cast.forEach((c, i) => (map[c.id] = c.slot || SLOTS[i]));
+  let n = 0;
+  // a narrator is a voice only: never drawn, never takes a character slot
+  spec.cast.forEach((c) => (map[c.id] = c.narrator ? "narrator" : c.slot || SLOTS[n++]));
   return map;
 }
 
 const CAPTION_BOTTOM = {
-  wide: { home: 1180, station: 800, cart: 1380, shop: 760, studio: 1200 },
+  wide: { home: 1180, station: 800, cart: 1380, shop: 760, studio: 1200, town: 470, classroom: 470, bedroom: 470 },
   closeup: 1250,
+  closeup3d: 330,
   close: 560,
+  close3d: 380,
   tour: { tall: 440, photo: 640, wide: 700 },
 };
 
@@ -57,6 +63,8 @@ export function buildProps(spec, voiced) {
     else if (b.enter) dur = 0.45;
     else if (b.dive) dur = typeof b.dive === "number" ? b.dive : 0.6;
     else if (b.shutter) dur = b.shutter;
+    else if (b.exit) dur = 0.45;
+    else if (b.move) dur = b.walk ?? 1.4;
     const beat = { ...b, i, from: t, to: t + dur };
     t += dur;
     return beat;
@@ -87,7 +95,12 @@ export function buildProps(spec, voiced) {
     if (kind.startsWith("closeup:")) s = { type: "closeup", who: slots[kind.split(":")[1]] };
     else if (kind === "tour") s = { type: "tour" };
     else if (kind === "cta") s = { type: "cta" };
-    else s = { type: "street", camera: kind === "dive" ? "dive" : kind === "close" ? "close" : "wide" };
+    else {
+      // "low:mia" = low camera focused on mia (3D worlds)
+      const [cam, id] = kind.split(":");
+      s = { type: "street", camera: ["dive", "close", "orbit", "top", "low"].includes(cam) ? cam : "wide" };
+      if (id && slots[id]) s.who = slots[id];
+    }
     const last = scenes[scenes.length - 1];
     if (last && JSON.stringify({ ...last, fromSec: 0, toSec: 0 }) === JSON.stringify({ ...s, fromSec: 0, toSec: 0 })) last.toSec = b.to;
     else scenes.push({ ...s, fromSec: b.from, toSec: b.to });
@@ -106,12 +119,13 @@ export function buildProps(spec, voiced) {
     }
     if (b.captions === false) continue;
     const k = b.scene;
+    const is3d = WORLDS_3D.includes(world);
     const bottom = k.startsWith("closeup")
-      ? CAPTION_BOTTOM.closeup
+      ? is3d ? CAPTION_BOTTOM.closeup3d : CAPTION_BOTTOM.closeup
       : k === "tour"
         ? CAPTION_BOTTOM.tour[layoutName]
-        : k === "close"
-          ? CAPTION_BOTTOM.close
+        : k.split(":")[0] === "close" || (is3d && ["top", "low"].includes(k.split(":")[0]))
+          ? is3d ? CAPTION_BOTTOM.close3d : CAPTION_BOTTOM.close
           : CAPTION_BOTTOM.wide[world] ?? 1180;
     zones.push({ fromSec: b.from, toSec: b.to, bottom });
   }
@@ -142,6 +156,8 @@ export function buildProps(spec, voiced) {
   };
 
   for (const b of beats) {
+    if (b.exit) sfx.push({ src: "sfx/magic.wav", atSec: b.from, volume: 0.6 });
+    if (b.move) sfx.push({ src: "sfx/whoosh.wav", atSec: b.from, volume: 0.15 });
     if (b.enter) {
       brokerOutAt = b.from;
       sfx.push({ src: "sfx/magic.wav", atSec: b.from, volume: 0.6 });
@@ -224,10 +240,55 @@ export function buildProps(spec, voiced) {
   const looks = { broker: {}, girl: {} };
   const colors = {};
   for (const c of spec.cast) {
+    if (c.narrator) {
+      if (c.color) colors.narrator = c.color;
+      continue;
+    }
     looks[slots[c.id]] = c.look || {};
     if (c.color) colors[slots[c.id]] = c.color;
   }
   if (!spec.cast.some((c) => slots[c.id] === "uncle")) delete looks.uncle;
+
+  // ---------------- 3D stage: positions, walks, facing, entrances ----------------
+  let stage3d;
+  if (WORLDS_3D.includes(world)) {
+    const actorsCast = spec.cast.filter((c) => !c.narrator);
+    const spots = { 1: [0], 2: [-3.2, 3.2], 3: [-4.6, 0, 4.6] }[actorsCast.length] || actorsCast.map((_, i) => -4.6 + i * 3);
+    const pos = {};
+    const actors = actorsCast.map((c, i) => {
+      pos[c.id] = c.pos || [spots[i], 0];
+      return { who: slots[c.id], pos: pos[c.id] };
+    });
+    const actorOf = (id) => actors.find((a) => a.who === slots[id]);
+    const moves = [];
+    const faces = [];
+    const sizes = [];
+    for (const b of beats) {
+      if (b.enter && actorOf(b.enter)) actorOf(b.enter).enterAt = b.from;
+      if (b.exit && actorOf(b.exit)) actorOf(b.exit).exitAt = b.from;
+      for (const [id, m] of Object.entries(b.move || {})) {
+        const to = Array.isArray(m) ? m : m.to;
+        if (!pos[id]) continue;
+        moves.push({ who: slots[id], fromSec: b.from, toSec: b.to, from: pos[id], to, run: !!m.run });
+        pos[id] = to;
+      }
+      for (const [id, size] of Object.entries(b.size || {})) {
+        if (!pos[id]) continue;
+        sizes.push({ who: slots[id], atSec: b.from, size });
+        const prev = [...sizes].reverse().find((x, k) => k > 0 && x.who === slots[id]);
+        sfx.push({ src: `sfx/${size < (prev?.size ?? 1) ? "shrink" : "grow"}.wav`, atSec: b.from, volume: 0.5 });
+      }
+      for (const [id, face] of Object.entries(b.face || {})) {
+        faces.push({ who: slots[id], fromSec: b.from, toSec: 1e9, face: spec.cast.some((c) => c.id === face) ? slots[face] : face });
+      }
+    }
+    // a later `face` for the same actor replaces the earlier one
+    for (const f of faces) {
+      const next = faces.find((g) => g !== f && g.who === f.who && g.fromSec > f.fromSec);
+      if (next) f.toSec = next.fromSec;
+    }
+    stage3d = { set: world, options: { night: wo.night, sign: wo.sign, signSub: wo.signSub, board: wo.board, poster: wo.poster }, actors, moves, faces, sizes, extras: wo.extras };
+  }
 
   const props = {
     durationSec: end,
@@ -262,7 +323,13 @@ export function buildProps(spec, voiced) {
     cta: cta || { atSec: end + 10, line: "", phone: "" },
     hook: spec.hook ? { text: spec.hook.text || spec.hook, untilSec: spec.hook.until ?? hookUntil, top: spec.hook.top ?? 230 } : { text: "", untilSec: 0 },
     looks,
+    stage3d,
   };
+
+  // every key explicit: Remotion fills missing input props from the composition's defaultProps (the demo skit),
+  // so an absent `rain` or `stage3d` would leak in from the demo
+  for (const k of Object.keys(props)) if (props[k] === undefined) props[k] = null;
+  if (!props.tracks) props.tracks = {};
 
   // audio cues the CLI turns into a crowd track
   const crowdCues = [];

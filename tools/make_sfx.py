@@ -25,6 +25,10 @@ EFFECTS = {
     "boom": ("aevalsrc=0.9*sin(2*PI*(90-40*t)*t)*exp(-2.5*t):d=1.2", None),
     "horn": ("aevalsrc=0.25*(sin(2*PI*311*t)+sin(2*PI*370*t)+0.5*sin(2*PI*622*t))*(1-exp(-12*t))*exp(-0.9*t):d=2.2", "afade=t=out:st=1.6:d=0.6"),
     "typing": ("anoisesrc=d=4:c=white:a=0.5", "highpass=f=2500,tremolo=f=14:d=1,tremolo=f=9:d=0.8,afade=t=in:d=0.2,afade=t=out:st=3.4:d=0.6,volume=1.2"),
+    "shrink": ("aevalsrc=0.5*sin(2*PI*(900-700*t)*t*1.0)*exp(-2.2*t):d=0.7", None),
+    "grow": ("aevalsrc=0.5*sin(2*PI*(200+900*t)*t)*exp(-2*t):d=0.7", None),
+    "boing": ("aevalsrc=0.6*sin(2*PI*(180+60*sin(2*PI*9*t))*t)*exp(-4*t):d=0.8", None),
+    "laugh": ("aevalsrc=0.35*sin(2*PI*(260+40*sin(2*PI*3*t))*t)*(0.5+0.5*sin(2*PI*7*t))*exp(-1.2*t):d=1.6", "afade=t=out:st=1.1:d=0.5"),
     "cooker": ("aevalsrc=0.35*sin(2*PI*(1900+120*sin(2*PI*7*t))*t)*(1-exp(-6*t))*exp(-0.6*t):d=1.6", "afade=t=out:st=1.1:d=0.5"),
 }
 

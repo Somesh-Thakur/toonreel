@@ -1,4 +1,4 @@
-edge-tts>=7.0
+edge-tts>=7.3.1   # older versions get HTTP 403 from the voice service
 faster-whisper>=1.1
 av<16          # faster-whisper breaks on av 16+
 soundfile

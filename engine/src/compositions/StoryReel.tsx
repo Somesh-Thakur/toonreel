@@ -63,7 +63,6 @@ const ClipView: React.FC<{ clip: StoryClip; frames: number }> = ({ clip, frames 
           src={staticFile(clip.src)}
           trimBefore={Math.round((clip.trimSec ?? 0) * fps)}
           muted={!clip.keepAudio}
-          objectFit="cover"
           style={{ width: "100%", height: "100%" }}
         />
       </AbsoluteFill>

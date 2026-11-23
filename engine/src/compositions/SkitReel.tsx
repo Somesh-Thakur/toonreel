@@ -24,14 +24,17 @@ import {
 } from "../components/Street";
 import { Img } from "remotion";
 import { CtaCard, LocationPin, PriceCard } from "./ShowcaseReel";
+import { Stage3D, type Stage3DSpec } from "../three/Stage3D";
 
 /** "girl" = the 2nd character slot (girl / chef / Gen-Z son…), "uncle" = optional 3rd character */
 type Who = "broker" | "girl" | "uncle";
+/** a narrator speaks (and gets captions) but is never drawn */
+type Speaker = Who | "narrator";
 type Win = { fromSec: number; toSec: number };
 
 export type SkitScene = Win &
   (
-    | { type: "street"; camera?: "wide" | "close" | "dive" }
+    | { type: "street"; camera?: "wide" | "close" | "dive" | "orbit" | "top" | "low"; who?: Who }
     | { type: "girl" }
     | { type: "closeup"; who: Who }
     | { type: "tour" }
@@ -56,11 +59,11 @@ type PriceWin = Win & { title: string; price: string; unit: string; sub?: string
 export type SkitReelProps = {
   durationSec: number;
   /** voice tracks per character slot; leave out for a silent preview (mouths follow the captions) */
-  tracks?: { broker?: string; girl?: string; uncle?: string; crowd?: string };
+  tracks?: { broker?: string; girl?: string; uncle?: string; narrator?: string; crowd?: string };
   /** pop-up "proof" video windows, e.g. lift footage when someone says "lift hai" */
   insets?: (Win & { src: string; trimSec: number; x: number; y: number; w: number; h: number; label?: string })[];
   sfx?: { src: string; atSec: number; volume?: number }[];
-  captions: (Caption & { speaker: Who })[];
+  captions: (Caption & { speaker: Speaker })[];
   captionZones: (Win & { bottom: number })[];
   scenes: SkitScene[];
   street: { interior?: string; sign1: string; sign2: string; shutterOpenAt: number; shutterDur: number; brokerOutAt: number };
@@ -71,9 +74,11 @@ export type SkitReelProps = {
   stickers: (Win & { text: string; icon?: "pin" | "area" | "none" })[];
   price: PriceWin | PriceWin[];
   /** "shop" = office/shop front with shutter; "cart" = food cart on a street; "studio" = game show */
-  world?: "shop" | "cart" | "studio" | "station" | "home";
+  world?: "shop" | "cart" | "studio" | "station" | "home" | "town" | "classroom" | "bedroom";
+  /** set for 3D worlds (town / classroom / bedroom): blocky 3D cast on a three.js stage */
+  stage3d?: Stage3DSpec | null;
   station?: { board: string; boardLocal?: string; banner?: string };
-  studioSign?: { sign: string; sub?: string };
+  studioSign?: { sign: string; sub?: string } | null;
   /** tour layout overrides (defaults: 16:9 screen at top, warm backdrop) */
   tour?: {
     style?: "warm" | "studio";
@@ -84,11 +89,11 @@ export type SkitReelProps = {
   };
   quiz?: (Win & { question: string; options: string[]; answer: number; lockAtSec: number; revealAtSec: number; top?: number })[];
   confetti?: Win[];
-  cartLabel?: string;
-  rain?: Win;
+  cartLabel?: string | null;
+  rain?: Win | null;
   /** tour screen height (563 = 16:9, 750 = 4:3) */
   screenH?: number;
-  colors?: { broker?: string; girl?: string; uncle?: string };
+  colors?: { broker?: string; girl?: string; uncle?: string; narrator?: string };
   cta: { atSec: number; line: string; phone: string; footer?: string };
   hook: { text: string; untilSec: number; top?: number };
   looks: { broker: CharacterLook; girl: CharacterLook; uncle?: CharacterLook };
@@ -117,6 +122,7 @@ export const SkitReel: React.FC<SkitReelProps> = (p) => {
   const brokerSrc = tr.broker ? staticFile(tr.broker) : undefined;
   const girlSrc = tr.girl ? staticFile(tr.girl) : undefined;
   const uncleSrc = tr.uncle ? staticFile(tr.uncle) : undefined;
+  const narratorSrc = tr.narrator ? staticFile(tr.narrator) : undefined;
   // preview mode: flap the mouth while that character's caption words are on
   const talkOf = (who: Who) => {
     const ms = t * 1000;
@@ -182,7 +188,7 @@ export const SkitReel: React.FC<SkitReelProps> = (p) => {
       <CartBackdrop dark={rainAmt} />
       {/* chef stands behind the cart */}
       <Character2D audioSrc={girlSrc} look={p.looks.girl} talkLevel={talkOf("girl")} pose={poseOf("girl")} scale={0.5} x={540} y={1330} gain={10} />
-      <CartFront label={p.cartLabel} />
+      <CartFront label={p.cartLabel ?? undefined} />
       {showBroker && (
         <Character2D
           audioSrc={brokerSrc}
@@ -214,8 +220,33 @@ export const SkitReel: React.FC<SkitReelProps> = (p) => {
     </>
   );
 
+  const stage3d = p.stage3d ? (
+    <Stage3D
+      spec={p.stage3d}
+      scenes={p.scenes}
+      t={t}
+      frame={frame}
+      looks={p.looks}
+      srcOf={srcOf}
+      talkOf={talkOf}
+      poseOf={poseOf}
+      excite={crowdNow.excite}
+      cheer={!!crowdNow.cheer}
+    />
+  ) : null;
+
   let body: React.ReactNode = null;
-  if (scene.type === "street" || scene.type === "cta") {
+  if (p.stage3d && scene.type !== "tour") {
+    const dive = scene.type === "street" && scene.camera === "dive";
+    const flash = dive ? interpolate(local, [len - 6, len], [0, 1], { extrapolateLeft: "clamp", extrapolateRight: "clamp" }) : 0;
+    body = (
+      <>
+        {stage3d}
+        {rainAmt > 0 && <Rain amount={rainAmt} />}
+        {flash > 0 && <AbsoluteFill style={{ background: "#fff", opacity: flash }} />}
+      </>
+    );
+  } else if (scene.type === "street" || scene.type === "cta") {
     const cam = scene.type === "street" ? scene.camera ?? "wide" : "wide";
     let scale = 1;
     // cart world: frame chef (x540) and broker (x850) together
@@ -261,7 +292,7 @@ export const SkitReel: React.FC<SkitReelProps> = (p) => {
     const s = spring({ frame: local, fps, config: { damping: 13 } });
     body = (
       <>
-        {p.tour?.style === "studio" ? <StudioBackdrop dim={0.25} /> : <TourBackdrop />}
+        {stage3d ?? (p.tour?.style === "studio" ? <StudioBackdrop dim={0.25} /> : <TourBackdrop />)}
         {/* the "screen" showing the real footage */}
         <div
           style={{
@@ -340,11 +371,13 @@ export const SkitReel: React.FC<SkitReelProps> = (p) => {
             LIVE TOUR
           </div>
         </div>
+        {!stage3d && (<>
         <Character2D audioSrc={brokerSrc} look={p.looks.broker} talkLevel={talkOf("broker")} pose={poseOf("broker")} scale={tc.scale} x={tc.brokerX} y={tc.y} />
         <Character2D audioSrc={girlSrc} look={p.looks.girl} talkLevel={talkOf("girl")} pose={poseOf("girl")} scale={tc.scale * 0.96} x={tc.girlX} y={tc.y} gain={11} />
         {p.looks.uncle && tc.uncleX !== undefined && (
           <Character2D audioSrc={uncleSrc} look={p.looks.uncle} talkLevel={talkOf("uncle")} pose={poseOf("uncle")} scale={tc.scale} x={tc.uncleX} y={tc.y} />
         )}
+        </>)}
       </>
     );
   }
@@ -431,7 +464,7 @@ export const SkitReel: React.FC<SkitReelProps> = (p) => {
 
       {/* captions, coloured by speaker, positioned per zone */}
       {p.captionZones.map((z, i) =>
-        (["broker", "girl", "uncle"] as Who[]).map((who) => {
+        (["broker", "girl", "uncle", "narrator"] as Speaker[]).map((who) => {
           const caps = p.captions.filter((c) => c.speaker === who && c.startMs >= z.fromSec * 1000 && c.startMs < z.toSec * 1000);
           if (!caps.length) return null;
           return (
@@ -445,7 +478,9 @@ export const SkitReel: React.FC<SkitReelProps> = (p) => {
                     ? p.colors?.broker ?? "#FFD400"
                     : who === "girl"
                       ? p.colors?.girl ?? "#FF7CC3"
-                      : p.colors?.uncle ?? "#FF8A65",
+                      : who === "uncle"
+                        ? p.colors?.uncle ?? "#FF8A65"
+                        : p.colors?.narrator ?? "#7CF5FF",
                 fontSize: 70,
               }}
             />
@@ -471,6 +506,7 @@ export const SkitReel: React.FC<SkitReelProps> = (p) => {
       {brokerSrc && <Audio src={brokerSrc} />}
       {girlSrc && <Audio src={girlSrc} />}
       {uncleSrc && <Audio src={uncleSrc} />}
+      {narratorSrc && <Audio src={narratorSrc} />}
       {tr.crowd && <Audio src={staticFile(tr.crowd)} volume={0.55} />}
       {(p.sfx ?? []).map((s, i) => (
         <Sequence key={`sfx${i}`} from={f(s.atSec)} layout="none">

@@ -70,18 +70,23 @@ main > section { width: min(1220px, 100% - 32px); margin-inline: auto; }
 .phone { position: relative; width: min(360px, 100%); aspect-ratio: 9 / 16; margin-inline: auto; border: 6px solid var(--ink); border-radius: 36px; overflow: hidden; background: #000; box-shadow: 12px 12px 0 var(--yellow); }
 .phone__note { position: absolute; left: 0; right: 0; bottom: -48px; margin: 0; text-align: center; font-size: .85rem; color: var(--mist); }
 .hero .phone { margin-bottom: 40px; overflow: visible; }
-.hero .phone > div { border-radius: 30px; overflow: hidden; }
+.hero .phone > div:not(.hero__switch) { border-radius: 30px; overflow: hidden; }
+.hero__switch { position: absolute; z-index: 2; top: -22px; right: -14px; display: flex; border: var(--line); border-radius: 999px; overflow: hidden; box-shadow: 4px 4px 0 var(--ink); }
+.hero__switch button { border: 0; padding: 8px 16px; font: 400 1.1rem var(--display); letter-spacing: .04em; background: var(--paper); color: var(--ink); cursor: pointer; }
+.hero__switch button + button { border-left: 2px solid var(--ink); }
+.hero__switch button[aria-pressed="true"] { background: var(--yellow); }
 
 /* examples */
 .examples { padding: 40px 0 90px; }
-.examples__row { display: grid; grid-template-columns: repeat(2, minmax(0, 300px)) 1fr; gap: 30px; margin-top: 34px; align-items: start; }
+.examples__row { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 26px; margin-top: 34px; align-items: start; }
+.example--how { grid-column: 1 / -1; }
 .example { margin: 0; }
 .example video { width: 100%; aspect-ratio: 9 / 16; border: 5px solid var(--ink); border-radius: 28px; background: #000; box-shadow: 8px 8px 0 var(--pink); }
 .example figcaption { display: grid; margin-top: 12px; }
 .example figcaption span { color: var(--mist); font-size: .9rem; }
 .example--how { background: var(--paper); color: var(--ink); border: var(--line); border-radius: 26px; padding: 26px 28px; box-shadow: 8px 8px 0 var(--yellow); }
 .example--how h3 { font: 400 1.9rem var(--display); }
-.example--how ul { margin: 14px 0 0; padding-left: 1.1em; display: grid; gap: 8px; }
+.example--how ul { margin: 14px 0 0; padding-left: 1.1em; display: grid; gap: 8px 34px; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); }
 
 /* studio */
 .studio { padding: 40px 0 90px; }
@@ -142,14 +147,13 @@ main > section { width: min(1220px, 100% - 32px); margin-inline: auto; }
 @media (max-width: 980px) {
   .hero { grid-template-columns: 1fr; padding-top: 36px; }
   .examples__row { grid-template-columns: 1fr 1fr; }
-  .example--how { grid-column: 1 / -1; }
   .studio__grid { grid-template-columns: 1fr; }
   .preview { position: static; order: -1; max-width: 340px; margin-inline: auto; }
   .install__grid { grid-template-columns: 1fr; }
 }
 @media (max-width: 560px) {
   .nav a:not(.btn) { display: none; }
-  .examples__row { grid-template-columns: 1fr; }
+  .examples__row { grid-template-columns: 1fr 1fr; gap: 16px; }
   .studio__bar .btn { flex: 1 1 100%; }
 }
 @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }

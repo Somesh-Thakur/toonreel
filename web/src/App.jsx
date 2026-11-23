@@ -4,13 +4,16 @@ import { SkitReel } from "@engine/compositions/SkitReel";
 import { demoSkit } from "@engine/skit/demo.js";
 import streetChef from "../../examples/street-chef.json";
 import quizShow from "../../examples/quiz-show.json";
+import liarTown from "../../examples/liar-town.json";
+import mindReader from "../../examples/mind-reader-class.json";
 import { previewProps } from "./preview.js";
 import { Studio } from "./Studio.jsx";
 
 const REPO = "https://github.com/Somesh-Thakur/toonreel";
 
 export function App() {
-  const heroProps = useMemo(() => previewProps(demoSkit), []);
+  const [heroMode, setHeroMode] = useState("3d");
+  const heroProps = useMemo(() => previewProps(heroMode === "3d" ? liarTown : demoSkit), [heroMode]);
   return (
     <>
       <header className="top">
@@ -35,7 +38,7 @@ export function App() {
           <div className="hero__copy">
             <h1>Write a skit. Get a cartoon reel.</h1>
             <p className="lead">
-              ToonReel is a free, open-source skill for AI agents like Claude Code. Describe a story, and it renders a 1080×1920 reel with lip-synced 2D characters, free voices in 400+ languages, word-by-word captions, crowds, quizzes and a call to action.
+              ToonReel is a free, open-source skill for AI agents like Claude Code. Describe a story, and it renders a 1080×1920 reel with lip-synced 3D toy characters or flat 2D cartoons, free voices in 400+ languages, word-by-word captions, crowds, quizzes and a call to action.
             </p>
             <div className="ctas">
               <a className="btn btn--yellow" href="#studio">
@@ -48,11 +51,20 @@ export function App() {
             <ul className="facts">
               <li>No subscriptions, no watermark</li>
               <li>Runs on your own computer</li>
+              <li>3D blocky story shorts and 2D skits</li>
               <li>Hindi, English and Hinglish voices built in</li>
             </ul>
           </div>
           <div className="phone" aria-label="Live preview of a ToonReel skit">
+            <div className="hero__switch" role="group" aria-label="Preview style">
+              {[["3d", "3D"], ["2d", "2D"]].map(([k, l]) => (
+                <button key={k} type="button" aria-pressed={heroMode === k} onClick={() => setHeroMode(k)}>
+                  {l}
+                </button>
+              ))}
+            </div>
             <Player
+              key={heroMode}
               component={SkitReel}
               inputProps={heroProps}
               durationInFrames={Math.ceil(heroProps.durationSec * 30)}
@@ -70,11 +82,13 @@ export function App() {
 
         <section className="examples" id="examples">
           <h2>Made with ToonReel</h2>
-          <p className="section-lead">Both reels below were rendered from a single JSON file each, with real voices and sound effects. Tap to play with sound.</p>
+          <p className="section-lead">Every reel below was rendered from a single JSON file, with real voices and sound effects. Tap to play with sound.</p>
           <div className="examples__row">
             {[
-              { src: "media/street-chef.mp4", poster: "media/street-chef.jpg", title: "Street chef in the rain", spec: streetChef, lang: "English" },
-              { src: "media/quiz-show.mp4", poster: "media/quiz-show.jpg", title: "Game-show quiz", spec: quizShow, lang: "Hinglish" },
+              { src: "media/liar-town.mp4", poster: "media/liar-town.jpg", title: "In this town, lies shrink you", spec: liarTown, lang: "3D, English" },
+              { src: "media/mind-reader-class.mp4", poster: "media/mind-reader-class.jpg", title: "The mind-reading teacher", spec: mindReader, lang: "3D, Indian English" },
+              { src: "media/street-chef.mp4", poster: "media/street-chef.jpg", title: "Street chef in the rain", spec: streetChef, lang: "2D, English" },
+              { src: "media/quiz-show.mp4", poster: "media/quiz-show.jpg", title: "Game-show quiz", spec: quizShow, lang: "2D, Hinglish" },
             ].map((ex) => (
               <figure className="example" key={ex.src}>
                 <video src={ex.src} poster={ex.poster} controls playsInline preload="none" />
@@ -89,9 +103,11 @@ export function App() {
             <div className="example example--how">
               <h3>What's in a reel</h3>
               <ul>
+                <li>3D blocky toy characters that walk, dance, shrink, grow and vanish, with orbiting, low-angle and top-down cameras</li>
                 <li>Original flat-2D characters: suits, chefs, kurtas, hoodies, caps, buns</li>
                 <li>Lip-sync driven by the real voice track</li>
-                <li>Five sets: street shop with shutter, food cart, game-show studio, railway station, living room</li>
+                <li>3D sets: town street, classroom, bedroom, by day or night. 2D sets: shop, food cart, game show, station, living room</li>
+                <li>A narrator voice for "In this town…" story shorts</li>
                 <li>Crowds that chatter and cheer, rain, confetti, speech bubbles</li>
                 <li>Your footage or photos on a "live tour" screen</li>
                 <li>Price cards, stickers, quiz boards and a final call to action</li>
@@ -100,7 +116,15 @@ export function App() {
           </div>
         </section>
 
-        <Studio examples={{ "Street chef (English)": streetChef, "Quiz show (Hinglish)": quizShow, "Blank skit": blankSkit() }} />
+        <Studio
+          examples={{
+            "In this town (3D)": liarTown,
+            "Mind-reading teacher (3D)": mindReader,
+            "Street chef (2D, English)": streetChef,
+            "Quiz show (2D, Hinglish)": quizShow,
+            "Blank skit (2D)": blankSkit(),
+          }}
+        />
 
         <section className="install" id="install">
           <h2>Install the skill</h2>

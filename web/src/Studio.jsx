@@ -9,8 +9,19 @@ const VOICES = [
   "ta-IN-ValluvarNeural", "te-IN-MohanNeural", "bn-IN-BashkarNeural", "gu-IN-NiranjanNeural", "es-ES-AlvaroNeural", "fr-FR-HenriNeural",
   "de-DE-ConradNeural", "ar-SA-HamedNeural", "pt-BR-AntonioNeural", "ja-JP-KeitaNeural",
 ];
-const WORLDS = { home: "Living room", station: "Railway station", cart: "Food cart", studio: "Game-show studio", shop: "Shop with shutter" };
-const BEAT_TYPES = { say: "Line of dialogue", pause: "Pause", enter: "Magic entrance", dive: "Camera dive", shutter: "Shutter opens" };
+const WORLDS = {
+  town: "3D · Town street",
+  classroom: "3D · Classroom",
+  bedroom: "3D · Bedroom",
+  home: "2D · Living room",
+  station: "2D · Railway station",
+  cart: "2D · Food cart",
+  studio: "2D · Game-show studio",
+  shop: "2D · Shop with shutter",
+};
+const IS3D = (w) => ["town", "classroom", "bedroom"].includes(w);
+const BEAT_TYPES = { say: "Line of dialogue", pause: "Pause", enter: "Magic entrance", exit: "Vanish (3D)", move: "Walk (3D)", dive: "Camera dive", shutter: "Shutter opens" };
+const ACTS = ["", "cheer", "dance", "wave", "point", "shock", "sad", "angry", "spin", "sit", "lie"];
 const STYLES = ["suit", "kurti", "chef", "hoodie", "uniform"];
 const HATS = ["none", "cap", "beret", "helmet", "chef"];
 const HAIR = ["short", "long", "bun"];
@@ -40,7 +51,10 @@ export function Studio({ examples }) {
     fn(n);
     return n;
   });
-  const sceneOptions = ["wide", "close", ...spec.cast.map((c) => `closeup:${c.id}`), "tour", "cta"];
+  const actors = spec.cast.filter((c) => !c.narrator);
+  const sceneOptions = IS3D(spec.world)
+    ? ["wide", "close", "orbit", "top", "low", ...actors.flatMap((c) => [`closeup:${c.id}`, `close:${c.id}`, `low:${c.id}`]), "dive", "tour"]
+    : ["wide", "close", ...actors.map((c) => `closeup:${c.id}`), "tour", "cta"];
 
   const download = () => {
     const blob = new Blob([JSON.stringify(spec, null, 2)], { type: "application/json" });
@@ -111,6 +125,10 @@ export function Studio({ examples }) {
               {spec.world === "station" && <TextField label="Banner on the building" value={spec.world_options?.banner} onChange={(v) => update((s) => ((s.world_options ||= {}).banner = v))} />}
               {spec.world === "cart" && <TextField label="Cart label" value={spec.world_options?.cartLabel} onChange={(v) => update((s) => ((s.world_options ||= {}).cartLabel = v))} />}
               {spec.world === "studio" && <TextField label="Studio sign" value={spec.world_options?.sign} onChange={(v) => update((s) => ((s.world_options ||= {}).sign = v))} />}
+              {spec.world === "town" && <TextField label="Shop sign" value={spec.world_options?.sign} onChange={(v) => update((s) => ((s.world_options ||= {}).sign = v))} />}
+              {spec.world === "classroom" && <TextField label="Chalkboard (use / for a new line)" value={(spec.world_options?.board || "").replace(/\n/g, " / ")} onChange={(v) => update((s) => ((s.world_options ||= {}).board = v.split(/\s*\/\s*/).join("\n")))} />}
+              {spec.world === "bedroom" && <TextField label="Poster" value={spec.world_options?.poster} onChange={(v) => update((s) => ((s.world_options ||= {}).poster = v))} />}
+              {IS3D(spec.world) && <Check label="Night time" value={!!spec.world_options?.night} onChange={(v) => update((s) => ((s.world_options ||= {}).night = v))} />}
               {spec.world === "shop" && <TextField label="Shop sign" value={spec.world_options?.shopSign1} onChange={(v) => update((s) => ((s.world_options ||= {}).shopSign1 = v))} />}
               <TextField label="Hook (put *one word* in stars for yellow)" value={spec.hook?.text ?? spec.hook ?? ""} onChange={(v) => update((s) => (s.hook = { ...(typeof s.hook === "object" ? s.hook : {}), text: v }))} />
               <label className="field">
@@ -128,7 +146,8 @@ export function Studio({ examples }) {
             <div className="panel">
               {spec.cast.map((c, i) => (
                 <fieldset className="card" key={i}>
-                  <legend>{i === 0 ? "Presenter (can make a magic entrance)" : `Character ${i + 1}`}</legend>
+                  <legend>{c.narrator ? "Narrator (voice only)" : `Character ${i + 1}`}</legend>
+                  <Check label="Narrator: a voice with captions, never drawn" value={!!c.narrator} onChange={(v) => update((s) => (v ? (s.cast[i].narrator = true) : delete s.cast[i].narrator))} />
                   <div className="row">
                     <TextField label="Name (id)" value={c.id} onChange={(v) => update((s) => renameCast(s, i, v))} />
                     <label className="field">
@@ -165,7 +184,7 @@ export function Studio({ examples }) {
                   )}
                 </fieldset>
               ))}
-              {spec.cast.length < 3 && (
+              {actors.length < 3 && (
                 <button className="btn" type="button" onClick={() => update((s) => s.cast.push({ id: `char${s.cast.length + 1}`, voice: "en-US-AvaNeural", look: { style: "hoodie", hat: "cap" } }))}>
                   Add a character
                 </button>
@@ -191,6 +210,13 @@ export function Studio({ examples }) {
                         </option>
                       ))}
                     </select>
+                    {["enter", "exit"].includes(typeOf(b)) && (
+                      <select value={b[typeOf(b)]} aria-label="Who" onChange={(e) => update((s) => (s.beats[i][typeOf(b)] = e.target.value))}>
+                        {actors.map((c) => (
+                          <option key={c.id}>{c.id}</option>
+                        ))}
+                      </select>
+                    )}
                     {typeOf(b) === "say" && (
                       <select value={b.say} aria-label="Who speaks" onChange={(e) => update((s) => (s.beats[i].say = e.target.value))}>
                         {spec.cast.map((c) => (
@@ -217,6 +243,19 @@ export function Studio({ examples }) {
                     </div>
                   </div>
                   {typeOf(b) === "say" && <textarea rows={2} value={b.text || ""} placeholder="What they say" onChange={(e) => update((s) => (s.beats[i].text = e.target.value))} />}
+                  {typeOf(b) === "move" && (() => {
+                    const [id, to] = Object.entries(b.move)[0] || [actors[0]?.id, [0, 0]];
+                    const xz = Array.isArray(to) ? to : to.to;
+                    const set = (nid, nxz) => update((s) => (s.beats[i].move = { [nid]: nxz }));
+                    return (
+                      <div className="row">
+                        <Select label="Who walks" value={id} options={actors.map((c) => c.id)} onChange={(v) => set(v, xz)} />
+                        <NumberField label="To x (−8 … 8)" value={xz[0]} min={-12} onChange={(v) => set(id, [v, xz[1]])} />
+                        <NumberField label="To z (−4 … 4)" value={xz[1]} min={-8} onChange={(v) => set(id, [xz[0], v])} />
+                        <NumberField label="Seconds" value={b.walk ?? 1.4} onChange={(v) => update((s) => (s.beats[i].walk = v))} />
+                      </div>
+                    );
+                  })()}
                   {typeOf(b) === "pause" && <NumberField label="Seconds" value={b.pause} onChange={(v) => update((s) => (s.beats[i].pause = v))} />}
                   <details className="beat__more">
                     <summary>Extras</summary>
@@ -236,13 +275,20 @@ export function Studio({ examples }) {
                       <Select label="Crowd" value={b.crowd || ""} options={["", "calm", "excited", "cheer"]} onChange={(v) => update((s) => (v ? (s.beats[i].crowd = v) : delete s.beats[i].crowd))} />
                       <Select label="Rain" value={b.rain === undefined ? "" : String(b.rain)} options={["", "true", "false"]} onChange={(v) => update((s) => (v ? (s.beats[i].rain = v === "true") : delete s.beats[i].rain))} />
                       <Check label="Confetti" value={!!b.confetti} onChange={(v) => update((s) => (v ? (s.beats[i].confetti = true) : delete s.beats[i].confetti))} />
-                      <Check label="Speaker cheers" value={!!(b.say && b.pose?.[b.say]?.cheer)} onChange={(v) => update((s) => {
+                      <Select label="Speaker acts" value={(b.say && Object.keys(b.pose?.[b.say] || {}).find((k) => ACTS.includes(k))) || ""} options={IS3D(spec.world) ? ACTS : ["", "cheer"]} onChange={(v) => update((s) => {
                         const id = s.beats[i].say;
                         if (!id) return;
                         s.beats[i].pose ||= {};
-                        if (v) s.beats[i].pose[id] = { cheer: true, jump: 40 };
+                        if (v) s.beats[i].pose[id] = v === "cheer" ? { cheer: true, jump: 40 } : { [v]: true };
                         else delete s.beats[i].pose[id];
                       })} />
+                      {IS3D(spec.world) && b.say && (
+                        <Select label="Speaker size" value={b.size?.[b.say] !== undefined ? String(b.size[b.say]) : ""} options={["", "0.4", "0.7", "1", "1.5", "2.2"]} onChange={(v) => update((s) => {
+                          const id = s.beats[i].say;
+                          if (v) (s.beats[i].size ||= {})[id] = parseFloat(v);
+                          else delete s.beats[i].size;
+                        })} />
+                      )}
                     </div>
                   </details>
                 </li>
@@ -254,6 +300,11 @@ export function Studio({ examples }) {
                 <button className="btn" type="button" onClick={() => update((s) => s.beats.push({ pause: 0.8 }))}>
                   Add a pause
                 </button>
+                {IS3D(spec.world) && (
+                  <button className="btn" type="button" onClick={() => update((s) => s.beats.push({ move: { [actors[0].id]: [0, 1] }, walk: 1.4 }))}>
+                    Add a walk
+                  </button>
+                )}
               </li>
             </ol>
           )}
@@ -317,10 +368,13 @@ function renameCast(s, i, v) {
   for (const b of s.beats) {
     if (b.say === old) b.say = id;
     if (b.enter === old) b.enter = id;
-    if (b.scene === `closeup:${old}`) b.scene = `closeup:${id}`;
-    if (b.pose?.[old]) {
-      b.pose[id] = b.pose[old];
-      delete b.pose[old];
+    if (b.exit === old) b.exit = id;
+    if (b.scene && b.scene.split(":")[1] === old) b.scene = `${b.scene.split(":")[0]}:${id}`;
+    for (const k of ["pose", "move", "size", "face"]) {
+      if (b[k]?.[old] !== undefined) {
+        b[k][id] = b[k][old];
+        delete b[k][old];
+      }
     }
   }
 }
@@ -330,7 +384,10 @@ function changeType(b, type, cast) {
   Object.keys(keep).forEach((k) => keep[k] === undefined && delete keep[k]);
   if (type === "say") return { say: cast[0].id, text: "", ...keep };
   if (type === "pause") return { pause: 0.8, ...keep };
-  if (type === "enter") return { enter: cast[0].id, ...keep };
+  const firstActor = (cast.find((c) => !c.narrator) || cast[0]).id;
+  if (type === "enter") return { enter: firstActor, ...keep };
+  if (type === "exit") return { exit: firstActor, ...keep };
+  if (type === "move") return { move: { [firstActor]: [0, 1] }, walk: 1.4, ...keep };
   if (type === "dive") return { dive: 0.6 };
   return { shutter: 1.0, ...keep };
 }
@@ -341,10 +398,10 @@ const TextField = ({ label, value, onChange }) => (
     <input value={value ?? ""} onChange={(e) => onChange(e.target.value)} />
   </label>
 );
-const NumberField = ({ label, value, onChange }) => (
+const NumberField = ({ label, value, onChange, min = 0.1 }) => (
   <label className="field field--small">
     <span>{label}</span>
-    <input type="number" step="0.1" min="0.1" value={value ?? 0.8} onChange={(e) => onChange(parseFloat(e.target.value) || 0.5)} />
+    <input type="number" step="0.1" min={min} value={value ?? 0.8} onChange={(e) => onChange(Number.isFinite(parseFloat(e.target.value)) ? parseFloat(e.target.value) : 0)} />
   </label>
 );
 const Select = ({ label, value, options, onChange }) => (

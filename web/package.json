@@ -9,15 +9,18 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@react-three/fiber": "9.8.2",
     "@remotion/captions": "4.0.544",
     "@remotion/google-fonts": "4.0.544",
     "@remotion/media": "4.0.544",
     "@remotion/media-utils": "4.0.544",
     "@remotion/player": "4.0.544",
+    "@remotion/three": "4.0.544",
     "@remotion/transitions": "4.0.544",
     "react": "19.3.1",
     "react-dom": "19.3.1",
-    "remotion": "4.0.544"
+    "remotion": "4.0.544",
+    "three": "0.187.0"
   },
   "devDependencies": {
     "@vitejs/plugin-react": "5.1.0",

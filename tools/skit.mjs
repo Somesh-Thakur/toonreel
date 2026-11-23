@@ -126,7 +126,7 @@ const mix = (clips, out, total) => {
 };
 const T = props.durationSec;
 const tracks = {};
-for (const slot of ["broker", "girl", "uncle"]) {
+for (const slot of ["broker", "girl", "uncle", "narrator"]) {
   // each line starts where the shared timeline put it
   const clips = timeline.filter((b) => b.say && slots[b.say] === slot).map((b) => ({ wav: voiced[b.i].wav, at: b.from }));
   if (!clips.length) continue;
@@ -155,13 +155,15 @@ console.log(`  props -> ${path.relative(ROOT, propsFile)} (${T}s)`);
 const outDir = path.resolve(opt("--out-dir", path.join(ROOT, "output")));
 fs.mkdirSync(outDir, { recursive: true });
 const rel = path.relative(ENGINE, propsFile);
+// 3D worlds need a real WebGL context in headless Chrome (ANGLE uses the GPU when there is one)
+const gl = props.stage3d ? [`--gl=${opt("--gl", "angle")}`] : [];
 if (flag("--still")) {
   const out = path.join(outDir, `${name}_still.png`);
-  remotion(["still", "src/index.ts", "SkitReel", out, `--props=${rel}`, `--frame=${opt("--still", "60")}`]);
+  remotion(["still", "src/index.ts", "SkitReel", out, `--props=${rel}`, `--frame=${opt("--still", "60")}`, ...gl]);
   console.log(`\n✔ ${out}`);
 } else {
   const out = path.join(outDir, `${name}${flag("--draft") ? "_draft" : ""}.mp4`);
   const extra = flag("--draft") ? ["--scale=0.3"] : [];
-  remotion(["render", "src/index.ts", "SkitReel", out, `--props=${rel}`, ...extra]);
+  remotion(["render", "src/index.ts", "SkitReel", out, `--props=${rel}`, ...extra, ...gl]);
   console.log(`\n✔ ${out}`);
 }
