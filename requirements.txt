@@ -1,0 +1,10 @@
+edge-tts>=7.0
+faster-whisper>=1.1
+av<16          # faster-whisper breaks on av 16+
+soundfile
+numpy
+pillow
+# optional extras (install when you need them):
+# kokoro-onnx      offline TTS (download models with setup --kokoro)
+# rembg[cpu]       background removal for character art / photos
+# yt-dlp           download your own reference clips
